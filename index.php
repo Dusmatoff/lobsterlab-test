@@ -1,4 +1,13 @@
 <?php
+/*
+ Структура таблицы
+
+    CREATE TABLE products (
+        id INT PRIMARY KEY,
+        title VARCHAR(255),
+        price DECIMAL(10, 2)
+    );
+ */
 $startTime = microtime(true);
 
 $host = 'localhost';
@@ -13,17 +22,6 @@ try {
         \PDO::MYSQL_ATTR_LOCAL_INFILE => true,
     ));
     $conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-
-    $createQuery = "
-        CREATE TABLE products (
-            id INT PRIMARY KEY,
-            title VARCHAR(255),
-            price DECIMAL(10, 2)
-        );
-    ";
-
-    $conn->query($createQuery);
-
 
     $query = "LOAD DATA LOCAL INFILE '$fileName' 
               INTO TABLE products 
