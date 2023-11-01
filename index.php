@@ -30,7 +30,8 @@ try {
               FIELDS TERMINATED BY ',' 
               LINES TERMINATED BY '\n' 
               IGNORE 1 LINES 
-              (id, title, price)";
+              (id, @title, @price)
+              SET title = TRIM(@title), price = TRIM(@price)";
 
     $conn->query($query);
 

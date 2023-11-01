@@ -31,7 +31,7 @@ try {
               FIELDS TERMINATED BY ',' 
               LINES TERMINATED BY '\n' 
               IGNORE 1 LINES 
-              (id, title, price);"
+              (id, title, price)"
     );
 
     //Копируем данные в рабочую таблицу из временной таблицы
@@ -39,7 +39,7 @@ try {
         "SHOW COLUMNS FROM products;
             INSERT INTO products
             SELECT * FROM temporary_products
-            ON DUPLICATE KEY UPDATE title = VALUES(title), price = VALUES(price);"
+            ON DUPLICATE KEY UPDATE title = TRIM(VALUES(title)), price = TRIM(VALUES(price));"
     );
 
     //Удаляем временную таблицу
