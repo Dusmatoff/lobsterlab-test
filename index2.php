@@ -21,18 +21,29 @@ try {
     ]);
     $conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
-    /*
-     * Этот вариант подходит, если мы импортируем данные только первый раз.
-     * При повторном импорте, обновить продукт не получится. Можно посмотреть второй вариант
-     */
-    $query = "LOAD DATA LOCAL INFILE '$fileName' 
-              INTO TABLE products 
+    //Создаём временную таблицу
+    $conn->query('CREATE TEMPORARY TABLE temporary_products LIKE products;');
+
+    //Импортируем данные в временную таблицу
+    $conn->query(
+        "LOAD DATA LOCAL INFILE '$fileName' 
+              INTO TABLE temporary_products 
               FIELDS TERMINATED BY ',' 
               LINES TERMINATED BY '\n' 
               IGNORE 1 LINES 
-              (id, title, price)";
+              (id, title, price);"
+    );
 
-    $conn->query($query);
+    //Копируем данные в рабочую таблицу из временной таблицы
+    $conn->query(
+        "SHOW COLUMNS FROM products;
+            INSERT INTO products
+            SELECT * FROM temporary_products
+            ON DUPLICATE KEY UPDATE title = VALUES(title), price = VALUES(price);"
+    );
+
+    //Удаляем временную таблицу
+    //$conn->query('DROP TEMPORARY TABLE temporary_products;');
 
     $endTime = microtime(true);
 
