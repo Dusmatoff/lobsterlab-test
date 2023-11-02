@@ -1,45 +1,29 @@
 <?php
-/*
- Структура таблицы
-
-    CREATE TABLE products (
-        id INT PRIMARY KEY,
-        title VARCHAR(255),
-        price DECIMAL(10, 2)
-    );
- */
 
 $config = include 'config.php';
-$startTime = microtime(true);
+require_once 'models/ProductModel.php';
+require_once 'controllers/ProductController.php';
+require_once 'views/ImportView.php';
+
+$dsn = 'mysql:host=' . $config['host'] . ';dbname=' . $config['database'];
 
 try {
-    $fileName = 'products.csv';
-    $dsn = 'mysql:host=' . $config['host'] . ';dbname=' . $config['database'];
-
     $conn = new \PDO($dsn, $config['userName'], $config['password'], [
         \PDO::MYSQL_ATTR_LOCAL_INFILE => true,
     ]);
     $conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
-    /*
-     * Этот вариант подходит, если мы импортируем данные только первый раз.
-     * При повторном импорте, обновить продукт не получится. Можно посмотреть второй вариант
-     */
-    $query = "LOAD DATA LOCAL INFILE '$fileName' 
-              INTO TABLE products 
-              FIELDS TERMINATED BY ',' 
-              LINES TERMINATED BY '\n' 
-              IGNORE 1 LINES 
-              (id, @title, @price)
-              SET title = TRIM(@title), price = TRIM(@price)";
+    $productModel = new ProductModel($conn);
+    $productController = new ProductController($productModel);
+    $view = new ImportView();
 
-    $conn->query($query);
-
+    $fileName = 'products.csv';
+    $startTime = microtime(true);
+    $success = $productController->importProducts($fileName);
     $endTime = microtime(true);
-
     $elapsedTime = $endTime - $startTime;
 
-    echo "Время добавления данных: $elapsedTime секунд.";
+    $view->showImportResult($success, $elapsedTime);
 } catch (\PDOException $e) {
-    echo "Ошибка при импорте данных: " . $e->getMessage();
+    echo "Ошибка подключения к базе данных: " . $e->getMessage();
 }
