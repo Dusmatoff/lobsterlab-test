@@ -1,51 +1,70 @@
 <?php
 
-class ProductModel {
+class ProductModel
+{
     private $conn;
 
-    public function __construct(\PDO $conn) {
+    public function __construct(\PDO $conn)
+    {
         $this->conn = $conn;
     }
 
-    public function importProductsFromCSV($fileName) {
+    public function importProductsFromCSV(string $fileName)
+    {
         try {
-            $query = "LOAD DATA LOCAL INFILE '$fileName' 
-                      INTO TABLE products 
-                      FIELDS TERMINATED BY ',' 
-                      LINES TERMINATED BY '\n' 
-                      IGNORE 1 LINES 
-                      (id, @title, @price)
-                      SET title = TRIM(@title), price = TRIM(@price)";
+            // Открываем транзакцию
+            $this->conn->beginTransaction();
 
-            $this->conn->query($query);
+            // Получаем названия столбцов из CSV-файла
+            $columns = $this->getColumnsFromCSV($fileName);
 
-            //Создаём временную таблицу
-            $this->conn->query('CREATE TEMPORARY TABLE temporary_products LIKE products;');
+            // Подготавливаем динамический SQL-запрос
+            $columnNames = implode(', ', $columns);
+            $placeholders = implode(', ', array_fill(0, count($columns), '?'));
 
-            //Импортируем данные в временную таблицу
-            $this->conn->query(
-                "LOAD DATA LOCAL INFILE '$fileName' 
-              INTO TABLE temporary_products 
-              FIELDS TERMINATED BY ',' 
-              LINES TERMINATED BY '\n' 
-              IGNORE 1 LINES 
-              (id, title, price)"
-            );
+            /* Множественная вставка
+             * Если написать INSERT INTO, может возникнуть ошибка, если такой id уже есть. Поэтому используется REPLACE INTO
+             */
+            $sql = "REPLACE INTO products ($columnNames) VALUES ($placeholders)";
+            $stmt = $this->conn->prepare($sql);
 
-            //Копируем данные в рабочую таблицу из временной таблицы
-            $this->conn->query(
-                "SHOW COLUMNS FROM products;
-            INSERT INTO products
-            SELECT * FROM temporary_products
-            ON DUPLICATE KEY UPDATE title = TRIM(VALUES(title)), price = TRIM(VALUES(price));"
-            );
+            foreach ($this->readDataFromCSV($fileName) as $data) {
+                if ($data[0] !== 'id') {
+                    $stmt->execute($data);
+                }
+            }
 
-            //Удаляем временную таблицу
-            $this->conn->query('DROP TEMPORARY TABLE temporary_products;');
+            // Подтверждаем транзакцию
+            $this->conn->commit();
 
             return true;
         } catch (\PDOException $e) {
+            // Если возникает ошибка, откатываем транзакцию
+            $this->conn->rollBack();
+            echo "Ошибка: " . $e->getMessage();
             return $e->getMessage();
         }
+    }
+
+    public function readDataFromCSV(string $fileName)
+    {
+        $handle = fopen($fileName, 'r');
+
+        while (($data = fgetcsv($handle, 1000)) !== false) {
+            yield $data;
+        }
+
+        fclose($handle);
+    }
+
+    public function getColumnsFromCSV(string $fileName)
+    {
+        $fileData = file($fileName,FILE_SKIP_EMPTY_LINES);
+        if (!$fileData) {
+            throw new \Exception('CSV file is empty');
+        }
+
+        $csv = array_map('str_getcsv', $fileData);
+        return array_shift($csv);
     }
 }
